@@ -23,6 +23,8 @@ go_library(
         "//pkg/control/server",
         "//pkg/coverage",
         "//pkg/log",
+        "//pkg/metric:metric_go_proto",
+        "//pkg/prometheus",
         "//pkg/sentry/control",
         "//pkg/sentry/platform",
         "//pkg/sentry/seccheck",

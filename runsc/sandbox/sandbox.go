@@ -39,6 +39,8 @@ import (
 	"gvisor.dev/gvisor/pkg/control/server"
 	"gvisor.dev/gvisor/pkg/coverage"
 	"gvisor.dev/gvisor/pkg/log"
+	metricpb "gvisor.dev/gvisor/pkg/metric/metric_go_proto"
+	"gvisor.dev/gvisor/pkg/prometheus"
 	"gvisor.dev/gvisor/pkg/sentry/control"
 	"gvisor.dev/gvisor/pkg/sentry/platform"
 	"gvisor.dev/gvisor/pkg/sentry/seccheck"
@@ -1176,6 +1178,38 @@ func (s *Sandbox) Reduce(wait bool) error {
 	return conn.Call(boot.UsageReduce, &control.UsageReduceOpts{
 		Wait: wait,
 	}, nil)
+}
+
+// GetRegisteredMetrics returns metric registration data from the sandbox.
+// This data is meant to be used as a way to sanity-check any exported metrics data during the
+// lifetime of the sandbox, in order to avoid a compromised sandbox from being able to produce
+// bogus metrics. As such, metric registration data should only be called and considered reliable
+// when obtained *before* any container has started within the sandbox.
+func (s *Sandbox) GetRegisteredMetrics() (*metricpb.MetricRegistration, error) {
+	conn, err := s.sandboxConnect()
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	data := &metricpb.MetricRegistration{}
+	if err = conn.Call(boot.MetricsGetRegistered, &control.GetRegisteredMetricsOpts{}, data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// ExportMetrics writes Prometheus-formatted metrics data to the given io.Writer.
+func (s *Sandbox) ExportMetrics() (*prometheus.Snapshot, error) {
+	conn, err := s.sandboxConnect()
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	data := &control.MetricsExportData{}
+	if err = conn.Call(boot.MetricsExport, &control.MetricsExportOpts{}, data); err != nil {
+		return nil, err
+	}
+	return data.Snapshot, nil
 }
 
 // IsRunning returns true if the sandbox or gofer process is running.
